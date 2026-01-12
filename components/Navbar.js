@@ -1,11 +1,20 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { getCookie } from '../app/utils/helpers';
 
 export default function Navbar() {
     const pathname = usePathname();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     const isActive = (path) => pathname === path;
+
+    useEffect(() => {
+        // Simple check: if access token cookie exists, we are logged in
+        const token = getCookie('fyers_access_token');
+        setIsLoggedIn(!!token);
+    }, [pathname]); // Re-check on route change
 
     return (
         <header className="container" style={{
@@ -43,13 +52,15 @@ export default function Navbar() {
             </nav>
 
             <div>
-                <Link href="/login" className="btn-primary" style={{
-                    fontSize: '0.9rem',
-                    padding: '0.6rem 1.25rem',
-                    boxShadow: '0 0 20px rgba(56, 189, 248, 0.2)'
-                }}>
-                    Login
-                </Link>
+                {!isLoggedIn && (
+                    <Link href="/login" className="btn-primary" style={{
+                        fontSize: '0.9rem',
+                        padding: '0.6rem 1.25rem',
+                        boxShadow: '0 0 20px rgba(56, 189, 248, 0.2)'
+                    }}>
+                        Login
+                    </Link>
+                )}
             </div>
         </header>
     );
