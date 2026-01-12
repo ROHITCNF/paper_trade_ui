@@ -37,7 +37,7 @@ function LoginContent() {
 
             if (authCodeCookie && accessTokenCookie) {
                 console.log("Algo: Both cookies present. Redirecting to Dashboard.");
-                router.replace('/home');
+                window.location.href = '/home';
             }
         };
 
@@ -59,7 +59,8 @@ function LoginContent() {
                 console.log("Token Generated Successfully");
                 setCookie('fyers_access_token', data.access_token);
                 // Redirect to dashboard
-                router.replace('/home');
+                // Force hard redirect to ensure state refresh
+                window.location.href = '/home';
             } else {
                 console.error("Failed to generate token:", data);
                 setStatus("Auth Failed: Code Expired or Invalid");
