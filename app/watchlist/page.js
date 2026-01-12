@@ -17,7 +17,11 @@ export default function WatchlistPage() {
             try {
                 const { fyersModel } = await import("fyers-web-sdk-v3");
                 const fyers = new fyersModel();
-                fyers.setAppId(process.env.NEXT_PUBLIC_APP_ID);
+
+                // Use Runtime Cookie App ID first, then fallback to Env
+                const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
+                fyers.setAppId(appId);
+
                 fyers.setAccessToken(getCookie('fyers_access_token'));
 
                 // Fetch in batches if list is huge, but Fyers usually supports up to 50 or 100 per call.
@@ -50,7 +54,11 @@ export default function WatchlistPage() {
         try {
             const { fyersModel } = await import("fyers-web-sdk-v3");
             const fyers = new fyersModel();
-            fyers.setAppId(process.env.NEXT_PUBLIC_APP_ID);
+
+            // Use Runtime Cookie App ID
+            const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
+            fyers.setAppId(appId);
+
             fyers.setAccessToken(getCookie('fyers_access_token'));
 
             // Calculate Date Range (Last 30 Days)

@@ -83,7 +83,8 @@ function LoginContent() {
             const fyers = new fyersModel();
 
             // Use User Input
-            const appId = appIdInput || process.env.NEXT_PUBLIC_APP_ID; // Fallback for dev convenience
+            const appId = appIdInput; // Fallback
+            const secretKey = secretKeyInput;
 
             if (!appId) {
                 setStatus("App ID is required");
@@ -91,8 +92,14 @@ function LoginContent() {
                 return;
             }
 
+            // Store App ID in cookie for runtime usage across app
+            setCookie('fyers_app_id', appId);
+            setCookie('fyers_secret_key', secretKey);
+            console.log("Runtime App ID set to cookie:", appId);
+
             fyers.setAppId(appId);
-            fyers.setRedirectUrl("http://192.168.1.18:2000/login"); // Redirect back to login page to handle query params
+
+            fyers.setRedirectUrl("http://192.168.1.18:2000/login");
 
             const authUrl = fyers.generateAuthCode();
             window.location.href = authUrl;
