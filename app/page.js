@@ -5,18 +5,6 @@ export default function Home() {
   return (
     <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
-      <header className="container" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 700, fontSize: '1.5rem', letterSpacing: '-0.02em' }}>
-          PaperTra.<span className="gradient-text">IO</span>
-        </div>
-        <nav style={{ display: 'flex', gap: '2rem', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-          <a href="#">Dashboard</a>
-          <a href="#">Markets</a>
-          <a href="#">Learn</a>
-          <a href="#">Profile</a>
-        </nav>
-      </header>
 
       {/* Hero Section */}
       <main className="container" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '100px 20px' }}>
