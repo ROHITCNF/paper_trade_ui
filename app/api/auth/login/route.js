@@ -3,14 +3,14 @@ import crypto from 'crypto';
 
 export async function POST(request) {
     try {
-        const { auth_code } = await request.json();
+        const { auth_code, appId, secretKey } = await request.json();
 
         if (!auth_code) {
             return NextResponse.json({ error: 'Auth code is required' }, { status: 400 });
         }
 
-        const appId = process.env.NEXT_PUBLIC_APP_ID;
-        const secretKey = process.env.NEXT_PUBLIC_SECRET_ID;
+        // const appId = process.env.NEXT_PUBLIC_APP_ID;
+        // const secretKey = process.env.NEXT_PUBLIC_SECRET_ID;
 
         // Fyers API requires SHA-256 hash of (appId + secretKey)
         const appIdHash = crypto.createHash('sha256').update(appId + ":" + secretKey).digest('hex');

@@ -50,7 +50,7 @@ function LoginContent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Important: If we want to support custom credentials, we need to pass them found in cookies or state
-                body: JSON.stringify({ auth_code: code })
+                body: JSON.stringify({ auth_code: code, appId: appIdInput, secretKey: secretKeyInput })
             });
 
             const data = await response.json();
@@ -100,7 +100,7 @@ function LoginContent() {
 
             fyers.setAppId(appId);
 
-            fyers.setRedirectUrl("https://paper-trade-io.vercel.app/login");
+            fyers.setRedirectUrl("http://192.168.1.23:2000/login");
 
             const authUrl = fyers.generateAuthCode();
             window.location.href = authUrl;

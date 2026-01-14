@@ -13,6 +13,7 @@
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "technicalindicators": "^3.1.0",
     "victory": "^37.3.6"
   },
   "devDependencies": {
