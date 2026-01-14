@@ -46,11 +46,13 @@ function LoginContent() {
 
     const generateAndSetToken = async (code) => {
         try {
+            const appId = getCookie('fyers_app_id');
+            const secretKey = getCookie('fyers_secret_key');
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Important: If we want to support custom credentials, we need to pass them found in cookies or state
-                body: JSON.stringify({ auth_code: code, appId: appIdInput, secretKey: secretKeyInput })
+                body: JSON.stringify({ auth_code: code, appId: appId, secretKey: secretKey })
             });
 
             const data = await response.json();
