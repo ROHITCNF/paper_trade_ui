@@ -1,5 +1,6 @@
 const watchlist = {
     'F&O_Stcoks': [
+        "MCX:SILVER26MARFUT",
         "NSE:SBILIFE-EQ",
         "NSE:CIPLA-EQ",
         "NSE:MARUTI-EQ",

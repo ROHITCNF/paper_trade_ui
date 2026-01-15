@@ -1,56 +1,46 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, seedDatabase } from '../utils/db';
 import { getCookie } from '../utils/helpers';
 import { useLiveQuery } from "dexie-react-hooks";
+import { useSocket } from "../context/SocketContext";
 
 export default function HomePage() {
-    // 1. Data Fetching via Dexie Hooks (Real-time updates from DB)
+    // 1. Data Fetching via Dexie Hooks
     const fundsParam = useLiveQuery(() => db.funds.get('main'));
     const orders = useLiveQuery(() => db.orders.orderBy('timestamp').reverse().toArray());
     const positions = useLiveQuery(() => db.positions.orderBy('timestamp').reverse().toArray());
     const trades = useLiveQuery(() => db.trades.orderBy('timestamp').reverse().toArray());
 
     const [activeTab, setActiveTab] = useState('POSITIONS');
-    const [livePrices, setLivePrices] = useState({});
-    const [unrealizedPnL, setUnrealizedPnL] = useState(0);
+    const { lastTick, subscribe } = useSocket();
 
-    // 2. Initial Setup
+    // 2. Manage Live Prices and Subscriptions
     useEffect(() => {
-        // Seed DB if new user
         seedDatabase();
-
-        // NOTE: Regular intervals for calling Quotes API have been removed as per user request.
-        // We will integrate sockets later for real-time updates.
-
-        const fetchInitialQuotes = async () => {
-            if (!positions || positions.length === 0) return;
-            // Optional: Fetch once on mount? The user asked to STOP calling in regular intervals.
-            // I'll keep one initial fetch so the PnL isn't empty on load, but no interval.
+        if (positions?.length > 0) {
             const symbols = positions.map(p => p.symbol);
-            try {
-                const { fyersModel } = await import("fyers-web-sdk-v3");
-                const fyers = new fyersModel();
-                const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
-                fyers.setAppId(appId);
-                fyers.setAccessToken(getCookie('fyers_access_token'));
+            subscribe(symbols);
+        }
+    }, [positions?.length]);
 
-                const response = await fyers.getQuotes(symbols);
-                if (response?.code === 200) {
-                    const priceMap = {};
-                    let totalUnrealized = 0;
-                    response.d.forEach(q => {
-                        priceMap[q.n] = q.v.lp;
-                        const pos = positions.find(p => p.symbol === q.n);
-                        if (pos) totalUnrealized += (q.v.lp - pos.avgPrice) * pos.qty;
-                    });
-                    setLivePrices(priceMap);
-                    setUnrealizedPnL(totalUnrealized);
+    // 3. Dynamic P&L Calculation based on Socket Ticks
+    const { livePrices, unrealizedPnL } = useMemo(() => {
+        const priceMap = {};
+        let totalUnrealized = 0;
+
+        if (positions) {
+            positions.forEach(pos => {
+                // Get latest LTP from socket tick, fallback to 0 (or we could fetch initial)
+                const ltp = lastTick[pos.symbol]?.ltp || 0;
+                priceMap[pos.symbol] = ltp;
+                if (ltp !== 0) {
+                    totalUnrealized += (ltp - pos.avgPrice) * pos.qty;
                 }
-            } catch (err) { console.error("Error fetching initial quotes:", err); }
-        };
-        fetchInitialQuotes();
-    }, [positions?.length]); // Only refetch if position count changes
+            });
+        }
+        return { livePrices: priceMap, unrealizedPnL: totalUnrealized };
+    }, [positions, lastTick]);
 
     // Calc Totals
     const availableFunds = fundsParam?.amount || 0;
@@ -144,7 +134,7 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
             <tbody>
                 {positions.map((pos) => {
                     const ltp = livePrices[pos.symbol] || 0;
-                    const pnl = (ltp - pos.avgPrice) * pos.qty;
+                    const pnl = ltp !== 0 ? (ltp - pos.avgPrice) * pos.qty : 0;
                     const type = pos.qty > 0 ? 'BUY' : 'SELL';
                     return (
                         <tr key={pos.symbol} style={styles.tr}>
@@ -152,7 +142,7 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
                             <td style={{ ...styles.td, fontWeight: 'bold', color: type === 'BUY' ? '#22c55e' : '#ef4444' }}>{type}</td>
                             <td style={{ ...styles.td, color: pos.qty > 0 ? '#22c55e' : '#ef4444' }}>{pos.qty}</td>
                             <td style={styles.td}>{pos.avgPrice.toFixed(2)}</td>
-                            <td style={styles.td}>{ltp ? ltp.toFixed(2) : 'Static'}</td>
+                            <td style={styles.td}>{ltp ? ltp.toFixed(2) : 'Waiting...'}</td>
                             <td style={{ ...styles.td, fontWeight: 'bold', color: pnl >= 0 ? '#22c55e' : '#ef4444' }}>
                                 {pnl.toFixed(2)}
                             </td>

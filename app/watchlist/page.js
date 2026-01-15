@@ -1,25 +1,29 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { watchlist } from "../utils/constants";
 import { getCookie } from "../utils/helpers";
 import { VictoryChart, VictoryCandlestick, VictoryAxis, VictoryTooltip, VictoryTheme } from "victory";
 import OrderModal from "../../components/OrderModal";
 import Toast from "../../components/Toast";
+import { useSocket } from "../context/SocketContext";
 
 export default function WatchlistPage() {
     const stockSymbols = watchlist['F&O_Stcoks'];
-    const [quotes, setQuotes] = useState({});
+    const [staticQuotes, setStaticQuotes] = useState({});
     const [selectedSymbol, setSelectedSymbol] = useState(null);
     const [chartData, setChartData] = useState([]);
     const [loadingChart, setLoadingChart] = useState(false);
     const [toast, setToast] = useState(null);
 
+    const { lastTick, subscribe, unsubscribe } = useSocket();
+
     // Order Modal State
     const [orderModalStock, setOrderModalStock] = useState(null);
     const [orderSide, setOrderSide] = useState('BUY');
 
+    // 1. Initial Fetch for static data (Exchange, etc.)
     useEffect(() => {
-        const fetchQuotes = async () => {
+        const fetchInitialQuotes = async () => {
             try {
                 const { fyersModel } = await import("fyers-web-sdk-v3");
                 const fyers = new fyersModel();
@@ -27,24 +31,49 @@ export default function WatchlistPage() {
                 fyers.setAppId(appId);
                 fyers.setAccessToken(getCookie('fyers_access_token'));
 
-                const response = await fyers.getQuotes(stockSymbols); // Pass array directly
+                const response = await fyers.getQuotes(stockSymbols);
                 if (response?.code === 200) {
                     const quotesMap = {};
                     response.d.forEach(quote => { quotesMap[quote.n] = quote.v; });
-                    setQuotes(quotesMap);
+                    setStaticQuotes(quotesMap);
 
-                    // Defaults
                     if (!selectedSymbol) {
                         setSelectedSymbol(stockSymbols[0]);
                         handleStockClick(stockSymbols[0]);
                     }
                 }
             } catch (err) {
-                console.error("Error fetching quotes:", err);
+                console.error("Error fetching initial quotes:", err);
             }
         };
-        fetchQuotes();
+        fetchInitialQuotes();
+
+        // Subscribe to all watchlist symbols on socket
+        subscribe(stockSymbols);
+
+        return () => {
+            // Unsubscribe when leaving page if needed, 
+            // but for a watchlist user might want it to keep ticking in bg for other components.
+            // Leaving it subscribed for now.
+        };
     }, []);
+
+    // 2. Merge Static Quotes with Live Socket Ticks
+    const mergedQuotes = useMemo(() => {
+        const merged = { ...staticQuotes };
+        Object.keys(lastTick).forEach(symbol => {
+            if (stockSymbols.includes(symbol)) {
+                const tick = lastTick[symbol];
+                merged[symbol] = {
+                    ...merged[symbol],
+                    lp: tick.ltp ?? merged[symbol]?.lp,
+                    ch: tick.ch ?? merged[symbol]?.ch,
+                    chp: tick.chp ?? merged[symbol]?.chp,
+                };
+            }
+        });
+        return merged;
+    }, [staticQuotes, lastTick, stockSymbols]);
 
     const handleStockClick = async (symbol) => {
         setSelectedSymbol(symbol);
@@ -85,17 +114,16 @@ export default function WatchlistPage() {
     };
 
     const openOrderModal = (e, symbol, side) => {
-        e.stopPropagation(); // Prevent triggering row click
+        e.stopPropagation();
         setOrderModalStock(symbol);
         setOrderSide(side);
     };
 
-    const formatPrice = (val) => val?.toFixed(2) || '0.00';
+    const formatPrice = (val) => typeof val === 'number' ? val.toFixed(2) : '0.00';
 
     return (
         <div className="container animate-fade-in" style={{ padding: '2rem 1rem', display: 'flex', gap: '1.5rem', height: 'calc(100vh - 100px)' }}>
 
-            {/* Modal */}
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
             {orderModalStock && (
@@ -107,12 +135,11 @@ export default function WatchlistPage() {
                 />
             )}
 
-            {/* Left Panel - Watchlist (30%) */}
             <div className="glass-panel" style={{ flex: '3', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>F&O Watchlist</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {stockSymbols.map((symbol, index) => {
-                        const data = quotes[symbol];
+                        const data = mergedQuotes[symbol];
                         const isPositive = data?.ch >= 0;
                         const changeColor = isPositive ? '#22c55e' : '#ef4444';
                         const isSelected = selectedSymbol === symbol;
@@ -127,17 +154,15 @@ export default function WatchlistPage() {
                                     border: isSelected ? '1px solid var(--accent-color)' : '1px solid transparent',
                                     cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem',
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                    position: 'relative', // For absolute positioning of buttons
-                                    overflow: 'hidden'    // To hide buttons initially? No, we use CSS group hover
+                                    position: 'relative',
+                                    overflow: 'hidden'
                                 }}
                             >
-                                {/* Left: Symbol & Exchange */}
                                 <div>
                                     <div style={{ fontWeight: '600' }}>{symbol.replace('NSE:', '').replace('-EQ', '')}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{data?.exchange || 'NSE'}</div>
                                 </div>
 
-                                {/* Right: Price Info (Hidden on Hover via CSS or conditional rendering) */}
                                 <div className="price-info" style={{ textAlign: 'right' }}>
                                     <div style={{ fontWeight: '600' }}>{data ? `₹${formatPrice(data.lp)}` : '-'}</div>
                                     <div style={{ fontSize: '0.75rem', color: changeColor }}>
@@ -145,7 +170,6 @@ export default function WatchlistPage() {
                                     </div>
                                 </div>
 
-                                {/* Order Buttons (Only visible on hover) */}
                                 <div className="order-buttons" style={{ position: 'absolute', right: '0.5rem', display: 'none', gap: '0.5rem' }}>
                                     <button
                                         onClick={(e) => openOrderModal(e, symbol, 'BUY')}
@@ -158,8 +182,6 @@ export default function WatchlistPage() {
                                         S
                                     </button>
                                 </div>
-
-                                {/* Inline Style for Hover Effect (Since we can't keyframe easily here, we use class names and global css or inline style injection) */}
                                 <style jsx>{`
                                     .watchlist-item:hover .price-info { display: none; }
                                     .watchlist-item:hover .order-buttons { display: flex !important; }
@@ -170,7 +192,6 @@ export default function WatchlistPage() {
                 </div>
             </div>
 
-            {/* Right Panel - Chart (70%) */}
             <div className="glass-panel" style={{ flex: '7', display: 'flex', flexDirection: 'column', padding: '2rem', position: 'relative' }}>
                 {selectedSymbol ? (
                     <>
