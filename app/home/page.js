@@ -8,25 +8,25 @@ export default function HomePage() {
     // 1. Data Fetching via Dexie Hooks (Real-time updates from DB)
     const fundsParam = useLiveQuery(() => db.funds.get('main'));
     const orders = useLiveQuery(() => db.orders.orderBy('timestamp').reverse().toArray());
-    const positions = useLiveQuery(() => db.positions.toArray());
+    const positions = useLiveQuery(() => db.positions.orderBy('timestamp').reverse().toArray());
     const trades = useLiveQuery(() => db.trades.orderBy('timestamp').reverse().toArray());
 
     const [activeTab, setActiveTab] = useState('POSITIONS');
     const [livePrices, setLivePrices] = useState({});
     const [unrealizedPnL, setUnrealizedPnL] = useState(0);
 
-    // 2. Fetch Live Prices for Open Positions
+    // 2. Initial Setup
     useEffect(() => {
         // Seed DB if new user
         seedDatabase();
 
-        const fetchLivePrices = async () => {
-            if (!positions || positions.length === 0) {
-                setLivePrices({});
-                setUnrealizedPnL(0);
-                return;
-            }
+        // NOTE: Regular intervals for calling Quotes API have been removed as per user request.
+        // We will integrate sockets later for real-time updates.
 
+        const fetchInitialQuotes = async () => {
+            if (!positions || positions.length === 0) return;
+            // Optional: Fetch once on mount? The user asked to STOP calling in regular intervals.
+            // I'll keep one initial fetch so the PnL isn't empty on load, but no interval.
             const symbols = positions.map(p => p.symbol);
             try {
                 const { fyersModel } = await import("fyers-web-sdk-v3");
@@ -39,36 +39,23 @@ export default function HomePage() {
                 if (response?.code === 200) {
                     const priceMap = {};
                     let totalUnrealized = 0;
-
                     response.d.forEach(q => {
-                        priceMap[q.n] = q.v.lp; // Last Traded Price
-                        // Calculate PnL for this stock
+                        priceMap[q.n] = q.v.lp;
                         const pos = positions.find(p => p.symbol === q.n);
-                        if (pos) {
-                            // PnL = (Current - Avg) * Qty
-                            // Works for short too: (Current - Avg) * (-Qty) = (Avg - Current) * NetQty
-                            totalUnrealized += (q.v.lp - pos.avgPrice) * pos.qty;
-                        }
+                        if (pos) totalUnrealized += (q.v.lp - pos.avgPrice) * pos.qty;
                     });
                     setLivePrices(priceMap);
                     setUnrealizedPnL(totalUnrealized);
                 }
-            } catch (err) {
-                console.error("Error fetching live prices:", err);
-            }
+            } catch (err) { console.error("Error fetching initial quotes:", err); }
         };
-
-        // Poll every 5 seconds for live PnL updates
-        fetchLivePrices();
-        const interval = setInterval(fetchLivePrices, 5000);
-        return () => clearInterval(interval);
-
-    }, [positions]); // Re-run if positions change
+        fetchInitialQuotes();
+    }, [positions?.length]); // Only refetch if position count changes
 
     // Calc Totals
     const availableFunds = fundsParam?.amount || 0;
     const realizedPnL = fundsParam?.realizedPnl || 0;
-    const totalPortfolioValue = availableFunds + unrealizedPnL; // Approx logic (Cash + MTM)
+    const totalPortfolioValue = availableFunds + unrealizedPnL;
 
     const formatRupee = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
 
@@ -150,6 +137,7 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
                     <th style={styles.th}>Avg Price</th>
                     <th style={styles.th}>LTP</th>
                     <th style={styles.th}>P&L</th>
+                    <th style={styles.th}>Time</th>
                 </tr>
             </thead>
             <tbody>
@@ -158,13 +146,14 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
                     const pnl = (ltp - pos.avgPrice) * pos.qty;
                     return (
                         <tr key={pos.symbol} style={styles.tr}>
-                            <td style={styles.td}>{pos.symbol.replace('NSE:', '').replace('-EQ', '')}</td>
+                            <td style={styles.td}>{pos.symbol}</td>
                             <td style={{ ...styles.td, color: pos.qty > 0 ? '#22c55e' : '#ef4444' }}>{pos.qty}</td>
                             <td style={styles.td}>{pos.avgPrice.toFixed(2)}</td>
-                            <td style={styles.td}>{ltp ? ltp.toFixed(2) : 'Loading...'}</td>
+                            <td style={styles.td}>{ltp ? ltp.toFixed(2) : 'Static'}</td>
                             <td style={{ ...styles.td, fontWeight: 'bold', color: pnl >= 0 ? '#22c55e' : '#ef4444' }}>
                                 {pnl.toFixed(2)}
                             </td>
+                            <td style={styles.td}>{pos.timestamp ? new Date(pos.timestamp).toLocaleTimeString() : '-'}</td>
                         </tr>
                     );
                 })}
@@ -191,7 +180,7 @@ const OrdersTable = ({ orders }) => {
                 {orders.map((order) => (
                     <tr key={order.orderId} style={styles.tr}>
                         <td style={styles.td}>{new Date(order.timestamp).toLocaleTimeString()}</td>
-                        <td style={styles.td}>{order.symbol.replace('NSE:', '').replace('-EQ', '')}</td>
+                        <td style={styles.td}>{order.symbol}</td>
                         <td style={{ ...styles.td, fontWeight: 'bold', color: order.type === 'BUY' ? '#22c55e' : '#ef4444' }}>{order.type}</td>
                         <td style={styles.td}>{order.qty}</td>
                         <td style={styles.td}>{order.price.toFixed(2)}</td>
@@ -220,7 +209,7 @@ const TradebookTable = ({ trades }) => {
                 {trades.map((trade) => (
                     <tr key={trade.tradeId} style={styles.tr}>
                         <td style={styles.td}>{new Date(trade.timestamp).toLocaleTimeString()}</td>
-                        <td style={styles.td}>{trade.symbol.replace('NSE:', '').replace('-EQ', '')}</td>
+                        <td style={styles.td}>{trade.symbol}</td>
                         <td style={styles.td}>{trade.qty}</td>
                         <td style={styles.td}>{trade.price.toFixed(2)}</td>
                         <td style={{ ...styles.td, fontSize: '0.8rem', opacity: 0.7 }}>{trade.orderId.substring(0, 8)}...</td>

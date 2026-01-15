@@ -6,7 +6,7 @@ export const db = new Dexie('PaperTradeDB');
 db.version(1).stores({
     funds: 'id, amount, realizedPnl, totalTrades', // Single row id='main'
     orders: 'orderId, symbol, type, qty, price, status, timestamp',
-    positions: 'symbol, qty, avgPrice, realizedPnl',
+    positions: 'symbol, qty, avgPrice, realizedPnl, timestamp',
     trades: 'tradeId, orderId, symbol, qty, price, timestamp'
 });
 
