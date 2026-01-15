@@ -116,7 +116,7 @@ function LoginContent() {
 
     return (
         <div className="glass-panel" style={{ padding: '2rem' }}>
-            <h1 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Login to PaperTra.IO</h1>
+            <h1 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Login to PaperTrade.IO</h1>
 
             <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
