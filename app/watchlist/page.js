@@ -1,9 +1,9 @@
-
 "use client";
 import { useEffect, useState } from "react";
 import { watchlist } from "../utils/constants";
 import { getCookie } from "../utils/helpers";
 import { VictoryChart, VictoryCandlestick, VictoryAxis, VictoryTooltip, VictoryTheme } from "victory";
+import OrderModal from "../../components/OrderModal";
 
 export default function WatchlistPage() {
     const stockSymbols = watchlist['F&O_Stcoks'];
@@ -12,56 +12,49 @@ export default function WatchlistPage() {
     const [chartData, setChartData] = useState([]);
     const [loadingChart, setLoadingChart] = useState(false);
 
+    // Order Modal State
+    const [orderModalStock, setOrderModalStock] = useState(null);
+    const [orderSide, setOrderSide] = useState('BUY');
+
     useEffect(() => {
         const fetchQuotes = async () => {
             try {
                 const { fyersModel } = await import("fyers-web-sdk-v3");
                 const fyers = new fyersModel();
-
-                // Use Runtime Cookie App ID first, then fallback to Env
                 const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
                 fyers.setAppId(appId);
-
                 fyers.setAccessToken(getCookie('fyers_access_token'));
 
-                // Fetch in batches if list is huge, but Fyers usually supports up to 50 or 100 per call.
-                // Assuming list fits in one call for now as per user code.
                 const response = await fyers.getQuotes(stockSymbols); // Pass array directly
-
                 if (response?.code === 200) {
-                    // Convert array to map for easy lookup: { "NSE:SBILIFE-EQ": { ...data } }
                     const quotesMap = {};
-                    response.d.forEach(quote => {
-                        quotesMap[quote.n] = quote.v;
-                    });
+                    response.d.forEach(quote => { quotesMap[quote.n] = quote.v; });
                     setQuotes(quotesMap);
-                    setSelectedSymbol(stockSymbols[0]);
-                    handleStockClick(stockSymbols[0]);
+
+                    // Defaults
+                    if (!selectedSymbol) {
+                        setSelectedSymbol(stockSymbols[0]);
+                        handleStockClick(stockSymbols[0]);
+                    }
                 }
             } catch (err) {
                 console.error("Error fetching quotes:", err);
             }
         };
-
         fetchQuotes();
     }, []);
 
     const handleStockClick = async (symbol) => {
         setSelectedSymbol(symbol);
         setLoadingChart(true);
-        setChartData([]); // Clear previous chart
-
+        setChartData([]);
         try {
             const { fyersModel } = await import("fyers-web-sdk-v3");
             const fyers = new fyersModel();
-
-            // Use Runtime Cookie App ID
             const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
             fyers.setAppId(appId);
-
             fyers.setAccessToken(getCookie('fyers_access_token'));
 
-            // Calculate Date Range (Last 30 Days)
             const toDate = Math.floor(Date.now() / 1000);
             const fromDate = toDate - (30 * 24 * 60 * 60);
 
@@ -75,22 +68,13 @@ export default function WatchlistPage() {
             };
 
             const response = await fyers.getHistory(input);
-            console.log("History Response:", response);
-
             if (response.s === "ok" && response.candles) {
-                // Fyers returns [timestamp, open, high, low, close, volume]
                 const formattedData = response.candles.map(c => ({
                     x: new Date(c[0] * 1000),
-                    open: c[1],
-                    high: c[2],
-                    low: c[3],
-                    close: c[4]
+                    open: c[1], high: c[2], low: c[3], close: c[4]
                 }));
                 setChartData(formattedData);
-            } else {
-                console.warn("No data found for symbol");
             }
-
         } catch (err) {
             console.error("Error fetching history:", err);
         } finally {
@@ -98,11 +82,26 @@ export default function WatchlistPage() {
         }
     };
 
-    // Helper for formatting
+    const openOrderModal = (e, symbol, side) => {
+        e.stopPropagation(); // Prevent triggering row click
+        setOrderModalStock(symbol);
+        setOrderSide(side);
+    };
+
     const formatPrice = (val) => val?.toFixed(2) || '0.00';
 
     return (
         <div className="container animate-fade-in" style={{ padding: '2rem 1rem', display: 'flex', gap: '1.5rem', height: 'calc(100vh - 100px)' }}>
+
+            {/* Modal */}
+            {orderModalStock && (
+                <OrderModal
+                    symbol={orderModalStock}
+                    side={orderSide}
+                    onClose={() => setOrderModalStock(null)}
+                />
+            )}
+
             {/* Left Panel - Watchlist (30%) */}
             <div className="glass-panel" style={{ flex: '3', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>F&O Watchlist</h2>
@@ -110,21 +109,22 @@ export default function WatchlistPage() {
                     {stockSymbols.map((symbol, index) => {
                         const data = quotes[symbol];
                         const isPositive = data?.ch >= 0;
-                        const changeColor = isPositive ? '#22c55e' : '#ef4444'; // Green or Red
+                        const changeColor = isPositive ? '#22c55e' : '#ef4444';
                         const isSelected = selectedSymbol === symbol;
 
                         return (
                             <div key={index}
                                 onClick={() => handleStockClick(symbol)}
+                                className="watchlist-item"
                                 style={{
                                     padding: '0.75rem', borderRadius: '8px',
                                     background: isSelected ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.03)',
                                     border: isSelected ? '1px solid var(--accent-color)' : '1px solid transparent',
                                     cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem',
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    position: 'relative', // For absolute positioning of buttons
+                                    overflow: 'hidden'    // To hide buttons initially? No, we use CSS group hover
                                 }}
-                                onMouseOver={(e) => !isSelected && (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                                onMouseOut={(e) => !isSelected && (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                             >
                                 {/* Left: Symbol & Exchange */}
                                 <div>
@@ -132,19 +132,33 @@ export default function WatchlistPage() {
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{data?.exchange || 'NSE'}</div>
                                 </div>
 
-                                {/* Right: Price Info */}
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontWeight: '600' }}>
-                                        {data ? `₹${formatPrice(data.lp)}` : '-'}
-                                    </div>
+                                {/* Right: Price Info (Hidden on Hover via CSS or conditional rendering) */}
+                                <div className="price-info" style={{ textAlign: 'right' }}>
+                                    <div style={{ fontWeight: '600' }}>{data ? `₹${formatPrice(data.lp)}` : '-'}</div>
                                     <div style={{ fontSize: '0.75rem', color: changeColor }}>
-                                        {data ? (
-                                            <>
-                                                {formatPrice(data.ch)} ({data?.chp?.toFixed(2)}%)
-                                            </>
-                                        ) : '-'}
+                                        {data ? `${formatPrice(data.ch)} (${data?.chp?.toFixed(2)}%)` : '-'}
                                     </div>
                                 </div>
+
+                                {/* Order Buttons (Only visible on hover) */}
+                                <div className="order-buttons" style={{ position: 'absolute', right: '0.5rem', display: 'none', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={(e) => openOrderModal(e, symbol, 'BUY')}
+                                        style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                                        B
+                                    </button>
+                                    <button
+                                        onClick={(e) => openOrderModal(e, symbol, 'SELL')}
+                                        style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                                        S
+                                    </button>
+                                </div>
+
+                                {/* Inline Style for Hover Effect (Since we can't keyframe easily here, we use class names and global css or inline style injection) */}
+                                <style jsx>{`
+                                    .watchlist-item:hover .price-info { display: none; }
+                                    .watchlist-item:hover .order-buttons { display: flex !important; }
+                                `}</style>
                             </div>
                         );
                     })}
@@ -168,11 +182,10 @@ export default function WatchlistPage() {
                             <div style={{ width: '100%', height: '100%' }}>
                                 <VictoryChart
                                     theme={VictoryTheme.material}
-                                    domainPadding={{ x: 20, y: 40 }} // Add Y padding to prevent candle cutoff
+                                    domainPadding={{ x: 20, y: 40 }}
                                     scale={{ x: "time" }}
                                     padding={{ top: 20, bottom: 50, left: 50, right: 50 }}
-                                    width={800} // Increase internal width for better resolution
-                                    height={400}
+                                    width={800} height={400}
                                 >
                                     <VictoryAxis
                                         tickFormat={(t) => `${t.getDate()}/${t.getMonth() + 1}`}
@@ -182,44 +195,18 @@ export default function WatchlistPage() {
                                             grid: { stroke: "rgba(255,255,255,0.05)", strokeDasharray: "4,4" }
                                         }}
                                     />
-                                    <VictoryAxis
-                                        dependentAxis
-                                        style={{
-                                            axis: { stroke: "rgba(255,255,255,0.1)" },
-                                            tickLabels: { fill: "var(--text-secondary)", fontSize: 10 },
-                                            grid: { stroke: "rgba(255,255,255,0.05)", strokeDasharray: "4,4" }
-                                        }}
+                                    <VictoryAxis dependentAxis style={{
+                                        axis: { stroke: "rgba(255,255,255,0.1)" },
+                                        tickLabels: { fill: "var(--text-secondary)", fontSize: 10 },
+                                        grid: { stroke: "rgba(255,255,255,0.05)", strokeDasharray: "4,4" }
+                                    }}
                                     />
                                     <VictoryCandlestick
                                         data={chartData}
-                                        style={{
-                                            data: {
-                                                fill: ({ datum }) => datum.close > datum.open ? "#22c55e" : "#ef4444",
-                                                stroke: ({ datum }) => datum.close > datum.open ? "#22c55e" : "#ef4444",
-                                                strokeWidth: 1
-                                            }
-                                        }}
-                                        labels={({ datum }) =>
-                                            `Date: ${datum.x.toLocaleDateString()}\nOpen: ${datum.open}\nHigh: ${datum.high}\nLow: ${datum.low}\nClose: ${datum.close}`
-                                        }
+                                        style={{ data: { fill: ({ datum }) => datum.close > datum.open ? "#22c55e" : "#ef4444", stroke: ({ datum }) => datum.close > datum.open ? "#22c55e" : "#ef4444", strokeWidth: 1 } }}
+                                        labels={({ datum }) => `Date: ${datum.x.toLocaleDateString()}\nOpen: ${datum.open}\nHigh: ${datum.high}\nLow: ${datum.low}\nClose: ${datum.close}`}
                                         labelComponent={
-                                            <VictoryTooltip
-                                                flyoutStyle={{
-                                                    fill: "#1e1e1e",
-                                                    stroke: "#333",
-                                                    strokeWidth: 1,
-                                                    filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.5))"
-                                                }}
-                                                style={{
-                                                    fill: "#f0f0f0",
-                                                    fontSize: 11,
-                                                    fontFamily: "Inter, sans-serif",
-                                                    textAnchor: "start"
-                                                }}
-                                                pointerLength={10}
-                                                cornerRadius={5}
-                                                flyoutPadding={12}
-                                            />
+                                            <VictoryTooltip flyoutStyle={{ fill: "#1e1e1e", stroke: "#333", strokeWidth: 1, filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.5))" }} style={{ fill: "#f0f0f0", fontSize: 11, fontFamily: "Inter, sans-serif", textAnchor: "start" }} pointerLength={10} cornerRadius={5} flyoutPadding={12} />
                                         }
                                     />
                                 </VictoryChart >
@@ -233,7 +220,6 @@ export default function WatchlistPage() {
                 ) : (
                     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>Select a stock from the watchlist</p>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', opacity: 0.7 }}>to view its interactive chart</p>
                     </div>
                 )}
             </div >
