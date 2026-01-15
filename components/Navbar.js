@@ -2,11 +2,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getCookie } from '../app/utils/helpers';
+import { getCookie, deleteCookie } from '../app/utils/helpers';
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [profileImage, setProfileImage] = useState(null);
 
     const isActive = (path) => pathname === path;
 
@@ -14,7 +15,36 @@ export default function Navbar() {
         // Simple check: if access token cookie exists, we are logged in
         const token = getCookie('fyers_access_token');
         setIsLoggedIn(!!token);
-    }, [pathname]); // Re-check on route change
+
+        if (token && !profileImage) {
+            const fetchProfile = async () => {
+                try {
+                    const { fyersModel } = await import("fyers-web-sdk-v3");
+                    const fyers = new fyersModel();
+                    const appId = getCookie('fyers_app_id') || process.env.NEXT_PUBLIC_APP_ID;
+                    fyers.setAppId(appId);
+                    fyers.setAccessToken(token);
+
+                    const response = await fyers.get_profile();
+                    console.log("Profile Data:", response);
+                    if (response.s === 'ok' && response.data?.image) {
+                        setProfileImage(response.data.image);
+                    }
+                } catch (error) {
+                    console.error("Error fetching profile:", error);
+                }
+            };
+            fetchProfile();
+        }
+    }, [pathname]);
+
+    const handleLogout = () => {
+        deleteCookie('fyers_access_token');
+        deleteCookie('fyers_auth_code');
+        deleteCookie('fyers_app_id');
+        deleteCookie('fyers_secret_key');
+        window.location.href = '/login';
+    };
 
     return (
         <header className="container" style={{
@@ -51,8 +81,38 @@ export default function Navbar() {
                 ))}
             </nav>
 
-            <div>
-                {!isLoggedIn && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {isLoggedIn ? (
+                    <>
+                        {profileImage && (
+                            <img
+                                src={profileImage}
+                                alt="Profile"
+                                style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    border: '2px solid var(--accent-color)',
+                                    objectFit: 'cover'
+                                }}
+                            />
+                        )}
+                        <button
+                            onClick={handleLogout}
+                            className="btn-primary"
+                            style={{
+                                fontSize: '0.9rem',
+                                padding: '0.6rem 1.25rem',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid #ef4444',
+                                color: '#ef4444',
+                                boxShadow: 'none'
+                            }}
+                        >
+                            Logout
+                        </button>
+                    </>
+                ) : (
                     <Link href="/login" className="btn-primary" style={{
                         fontSize: '0.9rem',
                         padding: '0.6rem 1.25rem',

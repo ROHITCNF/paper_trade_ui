@@ -102,7 +102,7 @@ function LoginContent() {
 
             fyers.setAppId(appId);
 
-            fyers.setRedirectUrl("https://paper-trade-io.vercel.app/login");
+            fyers.setRedirectUrl("http://192.168.1.23:2000/login");
 
             const authUrl = fyers.generateAuthCode();
             window.location.href = authUrl;
