@@ -62,8 +62,8 @@ export default function Navbar() {
             <nav style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                 {[
                     { name: 'Dashboard', path: '/home' },
-                    { name: 'Backtest', path: '/backtest' },
                     { name: 'Watchlist', path: '/watchlist' },
+                    { name: 'Backtest', path: '/backtest' },
                     { name: 'Reports', path: '/reports' },
                 ].map((link) => (
                     <Link

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { placeOrder } from '../app/utils/tradingEngine';
 import { getCookie } from '../app/utils/helpers';
 
-export default function OrderModal({ symbol, side, onClose }) {
+export default function OrderModal({ symbol, side, onClose, onSuccess }) {
     const [qty, setQty] = useState(1);
     const [price, setPrice] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +39,16 @@ export default function OrderModal({ symbol, side, onClose }) {
         setError(null);
         try {
             await placeOrder(symbol, orderSide, Number(qty), Number(price));
-            alert('Order Placed Successfully!');
+            if (onSuccess) {
+                onSuccess(
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span>{orderSide} Order Placed successfully</span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '2px' }}>
+                            {symbol} {qty} Qty
+                        </span>
+                    </div>
+                );
+            }
             onClose();
         } catch (err) {
             setError(err.message);

@@ -4,6 +4,7 @@ import { watchlist } from "../utils/constants";
 import { getCookie } from "../utils/helpers";
 import { VictoryChart, VictoryCandlestick, VictoryAxis, VictoryTooltip, VictoryTheme } from "victory";
 import OrderModal from "../../components/OrderModal";
+import Toast from "../../components/Toast";
 
 export default function WatchlistPage() {
     const stockSymbols = watchlist['F&O_Stcoks'];
@@ -11,6 +12,7 @@ export default function WatchlistPage() {
     const [selectedSymbol, setSelectedSymbol] = useState(null);
     const [chartData, setChartData] = useState([]);
     const [loadingChart, setLoadingChart] = useState(false);
+    const [toast, setToast] = useState(null);
 
     // Order Modal State
     const [orderModalStock, setOrderModalStock] = useState(null);
@@ -94,11 +96,14 @@ export default function WatchlistPage() {
         <div className="container animate-fade-in" style={{ padding: '2rem 1rem', display: 'flex', gap: '1.5rem', height: 'calc(100vh - 100px)' }}>
 
             {/* Modal */}
+            {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+
             {orderModalStock && (
                 <OrderModal
                     symbol={orderModalStock}
                     side={orderSide}
                     onClose={() => setOrderModalStock(null)}
+                    onSuccess={(msg) => setToast(msg)}
                 />
             )}
 

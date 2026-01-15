@@ -133,6 +133,7 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
             <thead>
                 <tr style={styles.thRow}>
                     <th style={styles.th}>Symbol</th>
+                    <th style={styles.th}>Type</th>
                     <th style={styles.th}>Qty</th>
                     <th style={styles.th}>Avg Price</th>
                     <th style={styles.th}>LTP</th>
@@ -144,9 +145,11 @@ const PositionsTable = ({ positions, livePrices, formatRupee }) => {
                 {positions.map((pos) => {
                     const ltp = livePrices[pos.symbol] || 0;
                     const pnl = (ltp - pos.avgPrice) * pos.qty;
+                    const type = pos.qty > 0 ? 'BUY' : 'SELL';
                     return (
                         <tr key={pos.symbol} style={styles.tr}>
                             <td style={styles.td}>{pos.symbol}</td>
+                            <td style={{ ...styles.td, fontWeight: 'bold', color: type === 'BUY' ? '#22c55e' : '#ef4444' }}>{type}</td>
                             <td style={{ ...styles.td, color: pos.qty > 0 ? '#22c55e' : '#ef4444' }}>{pos.qty}</td>
                             <td style={styles.td}>{pos.avgPrice.toFixed(2)}</td>
                             <td style={styles.td}>{ltp ? ltp.toFixed(2) : 'Static'}</td>
@@ -200,6 +203,7 @@ const TradebookTable = ({ trades }) => {
                 <tr style={styles.thRow}>
                     <th style={styles.th}>Time</th>
                     <th style={styles.th}>Symbol</th>
+                    <th style={styles.th}>Type</th>
                     <th style={styles.th}>Qty</th>
                     <th style={styles.th}>Price</th>
                     <th style={styles.th}>Order ID</th>
@@ -210,6 +214,7 @@ const TradebookTable = ({ trades }) => {
                     <tr key={trade.tradeId} style={styles.tr}>
                         <td style={styles.td}>{new Date(trade.timestamp).toLocaleTimeString()}</td>
                         <td style={styles.td}>{trade.symbol}</td>
+                        <td style={{ ...styles.td, fontWeight: 'bold', color: trade.type === 'BUY' ? '#22c55e' : '#ef4444' }}>{trade.type}</td>
                         <td style={styles.td}>{trade.qty}</td>
                         <td style={styles.td}>{trade.price.toFixed(2)}</td>
                         <td style={{ ...styles.td, fontSize: '0.8rem', opacity: 0.7 }}>{trade.orderId.substring(0, 8)}...</td>

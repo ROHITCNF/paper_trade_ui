@@ -153,6 +153,7 @@ export const placeOrder = async (symbol, side, qty, price) => {
             tradeId: generateUUID(),
             orderId,
             symbol,
+            type: side,
             qty,
             price,
             timestamp: new Date().toISOString()
